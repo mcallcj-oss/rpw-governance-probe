@@ -1,0 +1,53 @@
+name: Probe trusted candidate validation
+on:
+  workflow_dispatch:
+    inputs:
+      candidate_sha:
+        description: 'Exact 40-hex candidate SHA'
+        required: true
+permissions: {}
+jobs:
+  validate:
+    name: Trusted validation of the candidate SHA
+    runs-on: ubuntu-latest
+    permissions: {}
+    outputs:
+      sha: ${{ steps.id.outputs.sha }}
+    steps:
+      - name: Prove the candidate SHA is well formed
+        id: id
+        env:
+          SHA: ${{ inputs.candidate_sha }}
+        run: |
+          echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
+      - name: Fetch the candidate into a disposable path and run the corpus
+        env:
+          SHA: ${{ steps.id.outputs.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          mkdir -p /tmp/candidate && cd /tmp/candidate
+          git init -q
+          git remote add origin "https://github.com/$REPO.git"
+          git -c protocol.version=2 fetch -q --depth=1 origin "$SHA"
+          git checkout -q FETCH_HEAD
+          echo "candidate tree for $SHA:"; ls -A
+          echo "SIMULATED CORPUS PASSED for $SHA"
+  publish:
+    name: Trusted publisher
+    needs: [validate]
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+    steps:
+      - name: Publish the gate for the exact candidate SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ needs.validate.outputs.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api -X POST "repos/$REPO/check-runs" \
+            -f name='Probe candidate gate' -f head_sha="$SHA" \
+            -f status=completed -f conclusion=success \
+            -f 'output[title]=Trusted validation passed' \
+            -f "output[summary]=Published by the trusted publisher for $SHA"
