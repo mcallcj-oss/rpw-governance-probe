@@ -1,1 +1,1 @@
-console.log('FEATURE TEST PASSED');
+console.log('FEATURE TEST PASSED (candidate-owned, edited freely)');

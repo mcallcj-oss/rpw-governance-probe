@@ -1,1 +1,1 @@
-export const app = () => 'ok';
+export const app = () => 'ok-v2';
