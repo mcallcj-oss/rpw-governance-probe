@@ -14,24 +14,33 @@ jobs:
     outputs:
       sha: ${{ steps.id.outputs.sha }}
     steps:
-      - name: Prove the candidate SHA is well formed
+      - name: Prove candidate identity, tip and ancestry
         id: id
         env:
           SHA: ${{ inputs.candidate_sha }}
+          REPO: ${{ github.repository }}
         run: |
           echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'
+          mkdir -p /tmp/id && cd /tmp/id && git init -q
+          git remote add origin "https://github.com/$REPO.git"
+          git fetch -q origin '+refs/heads/main:refs/remotes/origin/main'
+          git fetch -q origin '+refs/runpayway/candidate:refs/remotes/origin/candidate'
+          git cat-file -e "$SHA^{commit}"
+          TIP=$(git rev-parse refs/remotes/origin/candidate)
+          echo "candidate tip=$TIP requested=$SHA"
+          test "$TIP" = "$SHA"
+          git merge-base --is-ancestor refs/remotes/origin/main "$SHA"
+          echo "ANCESTRY OK: $SHA descends from main"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-      - name: Fetch the candidate into a disposable path and run the corpus
+      - name: Run the corpus against the candidate in a disposable path
         env:
           SHA: ${{ steps.id.outputs.sha }}
           REPO: ${{ github.repository }}
         run: |
-          mkdir -p /tmp/candidate && cd /tmp/candidate
-          git init -q
+          mkdir -p /tmp/candidate && cd /tmp/candidate && git init -q
           git remote add origin "https://github.com/$REPO.git"
           git -c protocol.version=2 fetch -q --depth=1 origin "$SHA"
           git checkout -q FETCH_HEAD
-          echo "candidate tree for $SHA:"; ls -A
           echo "SIMULATED CORPUS PASSED for $SHA"
   publish:
     name: Trusted publisher
