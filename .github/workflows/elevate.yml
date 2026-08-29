@@ -1,0 +1,23 @@
+name: Probe elevation attack
+on:
+  push:
+    branches: [elevation-test]
+permissions:
+  checks: write
+jobs:
+  forge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Attempt to forge the required gate check from an untrusted branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          gh api -X POST "repos/$REPO/check-runs" \
+            -f name='Probe candidate gate' \
+            -f head_sha="$GITHUB_SHA" \
+            -f status=completed \
+            -f conclusion=success \
+            -f 'output[title]=FORGED' \
+            -f 'output[summary]=self-green attempt from untrusted branch' \
+            && echo "FORGE_SUCCEEDED" || echo "FORGE_FAILED"

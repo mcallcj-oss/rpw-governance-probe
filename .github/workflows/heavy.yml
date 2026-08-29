@@ -1,0 +1,14 @@
+name: Probe candidate validation
+on:
+  push:
+    branches: [candidate]
+permissions: {}
+jobs:
+  validate:
+    name: Probe heavy validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: echo "heavy validation ran for $GITHUB_SHA"
