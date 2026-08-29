@@ -1,1 +1,1 @@
-export const app = () => 'INSECURE';
+export const app = () => 'ok';

@@ -21,16 +21,36 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           echo "$SHA" | grep -Eq '^[0-9a-f]{40}$'
-          mkdir -p /tmp/id && cd /tmp/id && git init -q
-          git remote add origin "https://github.com/$REPO.git"
-          git fetch -q origin '+refs/heads/main:refs/remotes/origin/main'
+          git clone -q "https://github.com/$REPO.git" /tmp/trusted
+          cd /tmp/trusted
           git fetch -q origin '+refs/runpayway/candidate:refs/remotes/origin/candidate'
+          git fetch -q origin "$SHA"
           git cat-file -e "$SHA^{commit}"
           test "$(git rev-parse refs/remotes/origin/candidate)" = "$SHA"
-          git merge-base --is-ancestor refs/remotes/origin/main "$SHA"
+          git merge-base --is-ancestor origin/main "$SHA"
           echo "IDENTITY OK: $SHA is candidate tip and descends from main"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-      - name: Run the release-critical corpus against the candidate
+      - name: Prove the candidate has not altered the release-critical validator
+        env:
+          SHA: ${{ steps.id.outputs.sha }}
+        run: |
+          cd /tmp/trusted
+          git checkout -q origin/main -- .
+          FAIL=0
+          while IFS= read -r p; do
+            [ -z "$p" ] && continue
+            if git diff --quiet origin/main "$SHA" -- "$p"; then
+              echo "  UNCHANGED  $p"
+            else
+              echo "  ALTERED    $p"; FAIL=1
+            fi
+          done < .github/governance/critical-paths.txt
+          if [ "$FAIL" != "0" ]; then
+            echo "CRITICAL VALIDATOR CONTRACT VIOLATED: candidate altered a trusted-main asset"
+            exit 1
+          fi
+          echo "VALIDATOR CONTRACT INTACT"
+      - name: Run MAIN's release-critical validator against the candidate tree
         env:
           SHA: ${{ steps.id.outputs.sha }}
           REPO: ${{ github.repository }}
@@ -39,8 +59,10 @@ jobs:
           git remote add origin "https://github.com/$REPO.git"
           git -c protocol.version=2 fetch -q --depth=1 origin "$SHA"
           git checkout -q FETCH_HEAD
-          npm run test:critical
-          npm run test:feature
+          cd /tmp/trusted && git checkout -q origin/main -- .
+          node /tmp/trusted/scripts/ci/critical-gate.mjs /tmp/candidate
+      - name: Run candidate-owned feature tests
+        run: cd /tmp/candidate && npm run test:feature
   publish:
     name: Trusted publisher
     needs: [validate]

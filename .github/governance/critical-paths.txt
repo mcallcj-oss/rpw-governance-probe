@@ -1,0 +1,3 @@
+scripts/ci/critical-gate.mjs
+.github/governance/critical-paths.txt
+.github/workflows/validate.yml
