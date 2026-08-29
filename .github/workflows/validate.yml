@@ -26,13 +26,11 @@ jobs:
           git fetch -q origin '+refs/heads/main:refs/remotes/origin/main'
           git fetch -q origin '+refs/runpayway/candidate:refs/remotes/origin/candidate'
           git cat-file -e "$SHA^{commit}"
-          TIP=$(git rev-parse refs/remotes/origin/candidate)
-          echo "candidate tip=$TIP requested=$SHA"
-          test "$TIP" = "$SHA"
+          test "$(git rev-parse refs/remotes/origin/candidate)" = "$SHA"
           git merge-base --is-ancestor refs/remotes/origin/main "$SHA"
-          echo "ANCESTRY OK: $SHA descends from main"
+          echo "IDENTITY OK: $SHA is candidate tip and descends from main"
           echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-      - name: Run the corpus against the candidate in a disposable path
+      - name: Run the release-critical corpus against the candidate
         env:
           SHA: ${{ steps.id.outputs.sha }}
           REPO: ${{ github.repository }}
@@ -41,7 +39,8 @@ jobs:
           git remote add origin "https://github.com/$REPO.git"
           git -c protocol.version=2 fetch -q --depth=1 origin "$SHA"
           git checkout -q FETCH_HEAD
-          echo "SIMULATED CORPUS PASSED for $SHA"
+          npm run test:critical
+          npm run test:feature
   publish:
     name: Trusted publisher
     needs: [validate]

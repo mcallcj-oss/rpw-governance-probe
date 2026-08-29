@@ -1,0 +1,8 @@
+{
+  "name": "rpw-governance-probe",
+  "private": true,
+  "scripts": {
+    "test:critical": "node scripts/ci/critical-gate.mjs",
+    "test:feature": "node tests/feature.test.mjs"
+  }
+}
